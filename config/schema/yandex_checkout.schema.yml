@@ -1,0 +1,9 @@
+yandex_checkout.plugin.yandex_checkout-gateway:
+  type: commerce_payment_gateway_configuration
+  mapping:
+    shop_id:
+      type: string
+      label: 'shopId'
+    secret_key:
+      type: string
+      label: 'Secret key'

@@ -1,0 +1,10 @@
+name: Yandex Checkout Module
+description: Yandex Checkout Module description
+package: YandexCheckout
+type: module
+version: 1.0.0
+package: Commerce (contrib)
+core: 8.x
+dependencies:
+  - commerce:commerce_payment
+  - commerce:commerce_tax

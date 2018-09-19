@@ -1,0 +1,10 @@
+{
+  "name": "drupal/commerce_yandex_checkout",
+  "type": "drupal-module",
+  "description": "Provides Commerce integration for Yandex Checkout.",
+  "homepage": "",
+  "require": {
+    "drupal/commerce": "~2.0",
+    "yandex-money/yandex-checkout-sdk-php": "*"
+  }
+}

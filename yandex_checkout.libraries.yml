@@ -1,0 +1,17 @@
+billing_validation:
+  version: 1.x
+  js:
+    js/billing_validation.js: {}
+  dependencies:
+    - core/jquery
+    - core/jquery.once
+
+yandex-checkout-sdk-php:
+  remote: https://github.com/yandex-money/yandex-checkout-sdk-php
+  version: "1.0.2"
+  license:
+    name: MIT
+    url: https://github.com/yandex-money/yandex-checkout-sdk-php/LICENSE.md
+    gpl-compatible: true
+
+
