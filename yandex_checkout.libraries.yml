@@ -8,7 +8,7 @@ billing_validation:
 
 yandex-checkout-sdk-php:
   remote: https://github.com/yandex-money/yandex-checkout-sdk-php
-  version: "1.0.2"
+  version: "1.1.6"
   license:
     name: MIT
     url: https://github.com/yandex-money/yandex-checkout-sdk-php/LICENSE.md
