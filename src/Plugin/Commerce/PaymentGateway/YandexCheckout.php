@@ -46,7 +46,7 @@ use YandexCheckout\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YandexCheckout extends OffsitePaymentGatewayBase
 {
-    const YAMONEY_MODULE_VERSION = '1.0.0';
+    const YAMONEY_MODULE_VERSION = '1.0.2';
 
     /**
      * @property Client apiClient
@@ -140,9 +140,9 @@ class YandexCheckout extends OffsitePaymentGatewayBase
                     1 => t('Без НДС'),
                     2 => t('0%'),
                     3 => t('10%'),
-                    4 => t('18%'),
+                    4 => t('20%'),
                     5 => t('Расчётная ставка 10/110'),
-                    6 => t('Расчётная ставка 18/118'),
+                    6 => t('Расчётная ставка 20/120'),
                 ),
                 '#default_value' => $this->configuration['default_tax'],
             );
@@ -211,9 +211,9 @@ class YandexCheckout extends OffsitePaymentGatewayBase
                             1 => t('Без НДС'),
                             2 => t('0%'),
                             3 => t('10%'),
-                            4 => t('18%'),
+                            4 => t('20%'),
                             5 => t('Расчётная ставка 10/110'),
-                            6 => t('Расчётная ставка 18/118'),
+                            6 => t('Расчётная ставка 20/120'),
                         ),
                         '#default_value' => $defaultTaxValue,
                     );
