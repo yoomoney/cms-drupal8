@@ -16,6 +16,7 @@ use Drupal\yandex_checkout\Plugin\Commerce\PaymentGateway\YandexCheckout;
 use YandexCheckout\Client;
 use YandexCheckout\Model\ConfirmationType;
 use YandexCheckout\Request\Payments\CreatePaymentRequest;
+use Drupal\Core\Field\FieldItemInterface;
 
 class PaymentOffsiteForm extends BasePaymentOffsiteForm
 {
