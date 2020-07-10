@@ -46,7 +46,7 @@ use YandexCheckout\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YandexCheckout extends OffsitePaymentGatewayBase
 {
-    const YAMONEY_MODULE_VERSION = '1.0.2';
+    const YAMONEY_MODULE_VERSION = '1.1.0';
 
     /**
      * @property Client apiClient
@@ -71,6 +71,9 @@ class YandexCheckout extends OffsitePaymentGatewayBase
         $secretKey            = $this->configuration['secret_key'];
         $yandexCheckoutClient = new Client();
         $yandexCheckoutClient->setAuth($shopId, $secretKey);
+        $userAgent = $yandexCheckoutClient->getApiClient()->getUserAgent();
+        $userAgent->setCms('Drupal', \Drupal::VERSION);
+        $userAgent->setModule('yandex-money-cms-v2', self::YAMONEY_MODULE_VERSION);
         $this->apiClient = $yandexCheckoutClient;
     }
 

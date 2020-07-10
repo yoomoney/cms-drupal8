@@ -5,6 +5,6 @@
   "homepage": "",
   "require": {
     "drupal/commerce": "~2.0",
-    "yandex-money/yandex-checkout-sdk-php": "*"
+    "yandex-money/yandex-checkout-sdk-php": "^1.6"
   }
 }

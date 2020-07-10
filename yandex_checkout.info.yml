@@ -2,7 +2,7 @@ name: Yandex Checkout Module
 description: Yandex Checkout Module description
 package: YandexCheckout
 type: module
-version: 1.0.2
+version: 1.1.0
 project: Commerce (contrib)
 core: 8.x
 dependencies:
