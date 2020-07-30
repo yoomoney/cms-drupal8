@@ -46,7 +46,7 @@ use YandexCheckout\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YandexCheckout extends OffsitePaymentGatewayBase
 {
-    const YAMONEY_MODULE_VERSION = '1.1.0';
+    const YAMONEY_MODULE_VERSION = '1.1.1';
 
     /**
      * @property Client apiClient
