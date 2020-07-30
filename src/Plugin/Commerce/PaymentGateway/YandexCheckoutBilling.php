@@ -11,8 +11,8 @@ use Drupal\Core\Form\FormStateInterface;
  *
  * @CommercePaymentGateway(
  *   id = "yandex_checkout_billing",
- *   label = "Yandex Checkout Billing",
- *   display_label = "Yandex Checkout Billing",
+ *   label = "Billing",
+ *   display_label = "Billing",
  *   forms = {
  *     "offsite-payment" = "Drupal\yandex_checkout\PluginForm\YandexCheckout\PaymentBillingForm",
  *   },
@@ -34,7 +34,7 @@ class YandexCheckoutBilling extends OffsitePaymentGatewayBase
     {
         return [
                    'billing_id' => '',
-                   'narrative'  => $this->t('Order No. %order_id% Payment via Yandex.Billing'),
+                   'narrative'  => $this->t('Order No. %order_id% Payment via Billing'),
                ] + parent::defaultConfiguration();
     }
 
@@ -47,7 +47,7 @@ class YandexCheckoutBilling extends OffsitePaymentGatewayBase
 
         $form['billing_id'] = array(
             '#type'          => 'textfield',
-            '#title'         => $this->t('Yandex.Billing\'s identifier'),
+            '#title'         => $this->t('Billing\'s identifier'),
             '#default_value' => $this->configuration['billing_id'],
         );
 
@@ -55,7 +55,7 @@ class YandexCheckoutBilling extends OffsitePaymentGatewayBase
             '#type'          => 'textfield',
             '#title'         => $this->t('Payment purpose'),
             '#description'   => $this->t(
-                'Payment purpose is added to the payment order: specify whatever will help identify the order paid via Yandex.Billing'
+                'Payment purpose is added to the payment order: specify whatever will help identify the order paid via Billing'
             ),
             '#default_value' => $this->configuration['narrative'],
         );

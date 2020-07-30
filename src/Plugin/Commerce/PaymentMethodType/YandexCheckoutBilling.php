@@ -25,7 +25,7 @@ class YandexCheckoutBilling extends YandexCheckoutPaymentMethod
      */
     public function getLabel()
     {
-        return t('Yandex.Billing (bank card, e-wallets)');
+        return t('Billing (bank card, e-wallets)');
     }
 
     public function buildLabel(PaymentMethodInterface $payment_method)
