@@ -16,6 +16,8 @@ use Drupal\yandex_checkout\Plugin\Commerce\PaymentGateway\YandexCheckout;
 use YandexCheckout\Client;
 use YandexCheckout\Model\ConfirmationType;
 use YandexCheckout\Request\Payments\CreatePaymentRequest;
+use Drupal\commerce_order\Entity\OrderInterface;
+use YandexCheckout\Model\Payment;
 
 class PaymentOffsiteForm extends BasePaymentOffsiteForm
 {
@@ -56,9 +58,8 @@ class PaymentOffsiteForm extends BasePaymentOffsiteForm
                 ));
 
             if ($config['receipt_enabled'] == 1) {
-                /** @var UserInterface $profile */
-                $profile = $order->getCustomer();
-                $builder->setReceiptEmail($profile->getEmail());
+                $profileEmail = $order->getBillingProfile()->field_customer_email->value
+                $builder->setReceiptEmail($profileEmail);
                 $items = $order->getItems();
                 /** @var OrderItem $item */
                 foreach ($items as $item) {
