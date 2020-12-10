@@ -1,8 +1,8 @@
-name: Yandex Checkout Module
-description: Yandex Checkout Module description
-package: YandexCheckout
+name: YooKassa Module
+description: YooKassa Module description
+package: YooKassa
 type: module
-version: 1.1.1
+version: 2.0.0
 project: Commerce (contrib)
 core: 8.x
 dependencies:

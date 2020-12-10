@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\yandex_checkout\Plugin\Commerce\PaymentMethodType;
+namespace Drupal\yookassa\Plugin\Commerce\PaymentMethodType;
 
 
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
@@ -11,7 +11,7 @@ use Drupal\Core\Plugin\PluginBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 
-abstract class YandexCheckoutPaymentMethod extends PaymentMethodTypeBase
+abstract class YooKassaPaymentMethod extends PaymentMethodTypeBase
 {
 
     /**

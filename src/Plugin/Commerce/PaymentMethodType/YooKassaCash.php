@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\yandex_checkout\Plugin\Commerce\PaymentMethodType;
+namespace Drupal\yookassa\Plugin\Commerce\PaymentMethodType;
 
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
 
@@ -8,12 +8,12 @@ use Drupal\commerce_payment\Entity\PaymentMethodInterface;
  * Provides the PayPal payment method type.
  *
  * @CommercePaymentMethodType(
- *   id = "yandex_checkout_cash",
+ *   id = "yookassa_cash",
  *   label = @Translation("YC account"),
  *   create_label = @Translation("YC account"),
  * )
  */
-class YandexCheckoutCash extends YandexCheckoutPaymentMethod
+class YooKassaCash extends YooKassaPaymentMethod
 {
 
     /**
