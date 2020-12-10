@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\yandex_checkout\Plugin\Commerce\PaymentMethodType;
+namespace Drupal\yookassa\Plugin\Commerce\PaymentMethodType;
 
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
 use Drupal\commerce\BundleFieldDefinition;
@@ -8,12 +8,12 @@ use Drupal\commerce\BundleFieldDefinition;
 /**
  *
  * @CommercePaymentMethodType(
- *   id = "yandex_checkout_alfabank",
+ *   id = "yookassa_alfabank",
  *   label = @Translation("YC account"),
  *   create_label = @Translation("YC account"),
  * )
  */
-class YandexCheckoutAlfabank extends YandexCheckoutPaymentMethod
+class YooKassaAlfabank extends YooKassaPaymentMethod
 {
 
     /**

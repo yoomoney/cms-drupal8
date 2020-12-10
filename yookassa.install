@@ -1,0 +1,17 @@
+<?php
+/**
+ * Implements hook_requirements().
+ */
+function yookassa_requirements($phase) {
+  $requirements = [];
+  if ($phase == 'install' ) {
+    if (!class_exists('\YooKassa\Client')) {
+      $requirements['yookassa_sdk_library'] = [
+        'description' => t('YooMoney for business requires the yoomoney/yookassa-sdk-php library.'),
+        'severity' => REQUIREMENT_ERROR,
+      ];
+    }
+  }
+
+  return $requirements;
+}

@@ -1,0 +1,17 @@
+billing_validation:
+  version: 1.x
+  js:
+    js/billing_validation.js: {}
+  dependencies:
+    - core/jquery
+    - core/jquery.once
+
+yookassa-sdk-php:
+  remote: https://github.com/yoomoney/yookassa-sdk-php
+  version: "2.0.3"
+  license:
+    name: MIT
+    url: https://github.com/yoomoney/yookassa-sdk-php/blob/master/LICENSE.md
+    gpl-compatible: true
+
+

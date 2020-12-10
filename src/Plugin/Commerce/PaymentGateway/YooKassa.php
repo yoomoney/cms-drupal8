@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\yandex_checkout\Plugin\Commerce\PaymentGateway;
+namespace Drupal\yookassa\Plugin\Commerce\PaymentGateway;
 
 
 use Drupal\commerce\Response\NeedsRedirectException;
@@ -18,25 +18,25 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use YandexCheckout\Client;
-use YandexCheckout\Model\NotificationEventType;
-use YandexCheckout\Model\Notification\NotificationSucceeded;
-use YandexCheckout\Model\Notification\NotificationWaitingForCapture;
-use YandexCheckout\Model\PaymentStatus;
-use YandexCheckout\Request\Payments\Payment\CreateCaptureRequest;
+use YooKassa\Client;
+use YooKassa\Model\NotificationEventType;
+use YooKassa\Model\Notification\NotificationSucceeded;
+use YooKassa\Model\Notification\NotificationWaitingForCapture;
+use YooKassa\Model\PaymentStatus;
+use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
 
 /**
  *
  * @CommercePaymentGateway(
- *   id = "yandex_checkout",
- *   label = "Yandex Checkout",
- *   display_label = "Yandex Checkout",
+ *   id = "yookassa",
+ *   label = "YooKassa",
+ *   display_label = "YooKassa",
  *   forms = {
- *     "offsite-payment" = "Drupal\yandex_checkout\PluginForm\YandexCheckout\PaymentOffsiteForm",
- *     "test-action" = "Drupal\yandex_checkout\PluginForm\YandexCheckout\PaymentMethodAddForm"
+ *     "offsite-payment" = "Drupal\yookassa\PluginForm\YooKassa\PaymentOffsiteForm",
+ *     "test-action" = "Drupal\yookassa\PluginForm\YooKassa\PaymentMethodAddForm"
  *   },
  *   payment_method_types = {
- *     "yandex_checkout_epl"
+ *     "yookassa_epl"
  *   },
  *   modes = {
  *     "n/a" = @Translation("N/A"),
@@ -44,9 +44,9 @@ use YandexCheckout\Request\Payments\Payment\CreateCaptureRequest;
  * )
  *
  */
-class YandexCheckout extends OffsitePaymentGatewayBase
+class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YAMONEY_MODULE_VERSION = '1.1.1';
+    const YOOMONEY_MODULE_VERSION = '2.0.0';
 
     /**
      * @property Client apiClient
@@ -69,12 +69,12 @@ class YandexCheckout extends OffsitePaymentGatewayBase
             $payment_method_type_manager, $time);
         $shopId               = $this->configuration['shop_id'];
         $secretKey            = $this->configuration['secret_key'];
-        $yandexCheckoutClient = new Client();
-        $yandexCheckoutClient->setAuth($shopId, $secretKey);
-        $userAgent = $yandexCheckoutClient->getApiClient()->getUserAgent();
+        $YooKassaClient = new Client();
+        $YooKassaClient->setAuth($shopId, $secretKey);
+        $userAgent = $YooKassaClient->getApiClient()->getUserAgent();
         $userAgent->setCms('Drupal', \Drupal::VERSION);
-        $userAgent->setModule('yandex-money-cms-v2', self::YAMONEY_MODULE_VERSION);
-        $this->apiClient = $yandexCheckoutClient;
+        $userAgent->setModule('yoomoney-cms', self::YOOMONEY_MODULE_VERSION);
+        $this->apiClient = $YooKassaClient;
     }
 
     /**
@@ -88,7 +88,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
                    'description_template' => '',
                    'receipt_enabled'     => '',
                    'default_tax'         => '',
-                   'yandex_checkout_tax' => array(),
+                   'yookassa_tax' => array(),
                    'notification_url'    => '',
                ] + parent::defaultConfiguration();
     }
@@ -120,7 +120,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
         $form['description_template'] = [
             '#type'          => 'textfield',
             '#title'         => t('Описание платежа'),
-            '#description'   => t('Это описание транзакции, которое пользователь увидит при оплате, а вы — в личном кабинете Яндекс.Кассы. Например, «Оплата заказа №72».<br>
+            '#description'   => t('Это описание транзакции, которое пользователь увидит при оплате, а вы — в личном кабинете ЮKassa. Например, «Оплата заказа №72».<br>
 Чтобы в описание подставлялся номер заказа (как в примере), поставьте на его месте %order_id% (Оплата заказа №%order_id%).<br>
 Ограничение для описания — 128 символов.'),
             '#default_value' => !empty($this->configuration['description_template'])
@@ -130,7 +130,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
 
         $form['receipt_enabled'] = array(
             '#type'          => 'checkbox',
-            '#title'         => $this->t('Отправлять в Яндекс.Кассу данные для чеков (54-ФЗ)'),
+            '#title'         => $this->t('Отправлять в ЮKassa данные для чеков (54-ФЗ)'),
             '#default_value' => $this->configuration['receipt_enabled'],
         );
         if ($this->configuration['receipt_enabled']) {
@@ -161,7 +161,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
 
             if ($taxRates) {
 
-                $form['yandex_checkout_tax_label'] = [
+                $form['yookassa_tax_label'] = [
                     '#type'  => 'html_tag',
                     '#tag'   => 'label',
                     '#value' => $this->t('Сопоставьте ставки'),
@@ -179,34 +179,34 @@ class YandexCheckout extends OffsitePaymentGatewayBase
 
                 ];
 
-                $form['yandex_checkout_tax_wrapper_begin'] = array(
+                $form['yookassa_tax_wrapper_begin'] = array(
                     '#markup' => '<div>',
                 );
 
-                $form['yandex_checkout_label_shop_tax'] = array(
+                $form['yookassa_label_shop_tax'] = array(
                     '#markup' => t('<div style="float: left;width: 200px;">Ставка в вашем магазине.</div>'),
                 );
 
-                $form['yandex_checkout_label_tax_rate'] = array(
+                $form['yookassa_label_tax_rate'] = array(
                     '#markup' => t('<div>Ставка для чека в налоговую.</div>'),
                 );
 
-                $form['yandex_checkout_tax_wrapper_end'] = array(
+                $form['yookassa_tax_wrapper_end'] = array(
                     '#markup' => '</div>',
                 );
 
                 foreach ($taxRates as $taxRate) {
-                    $form['yandex_checkout_tax']['yandex_checkout_tax_label_'.$taxRate['id'].'_begin'] = array(
+                    $form['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_begin'] = array(
                         '#markup' => '<div>',
                     );
-                    $form['yandex_checkout_tax']['yandex_checkout_tax_label_'.$taxRate['id'].'_lbl']   = array(
+                    $form['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_lbl']   = array(
                         '#markup' => t('<div style="width: 200px;float: left;padding-top: 5px;"><label>'.$taxRate['label'].'</label></div>'),
                     );
 
-                    $defaultTaxValue = isset($this->configuration['yandex_checkout_tax'][$taxRate['id']])
-                        ? $this->configuration['yandex_checkout_tax'][$taxRate['id']]
+                    $defaultTaxValue = isset($this->configuration['yookassa_tax'][$taxRate['id']])
+                        ? $this->configuration['yookassa_tax'][$taxRate['id']]
                         : 1;
-                    $form['yandex_checkout_tax'][$taxRate['id']] = array(
+                    $form['yookassa_tax'][$taxRate['id']] = array(
                         '#type'          => 'select',
                         '#title'         => false,
                         '#label'         => false,
@@ -221,7 +221,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
                         '#default_value' => $defaultTaxValue,
                     );
 
-                    $form['yandex_checkout_tax']['yandex_checkout_tax_label_'.$taxRate['id'].'_end'] = array(
+                    $form['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_end'] = array(
                         '#markup' => '</div><br style="clear: both;">',
                     );
                 }
@@ -239,7 +239,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
         $form['log_file'] = [
             '#type' => 'item',
             '#title' => t('Логирование'),
-            '#markup' => t('Посмотреть <a href="' . $GLOBALS['base_url'] . '/admin/reports/dblog?type[]=yandex_checkout"
+            '#markup' => t('Посмотреть <a href="' . $GLOBALS['base_url'] . '/admin/reports/dblog?type[]=yookassa"
              target="_blank">записи журнала</a>.')
         ];
 
@@ -253,7 +253,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
         if (!preg_match('/^test_.*|live_.*$/i', $values['secret_key'])) {
             $markup = new TranslatableMarkup('Такого секретного ключа нет. Если вы уверены, что скопировали ключ правильно, значит, он по какой-то причине не работает.
                   Выпустите и активируйте ключ заново — 
-                  <a href="https://money.yandex.ru/joinups">в личном кабинете Яндекс.Кассы</a>');
+                  <a href="https://yookassa.ru/joinups">в личном кабинете ЮKassa</a>');
             $form_state->setError($form['secret_key'], $markup);
         }
     }
@@ -271,7 +271,7 @@ class YandexCheckout extends OffsitePaymentGatewayBase
             $this->configuration['description_template'] = $values['description_template'];
             $this->configuration['receipt_enabled']     = $values['receipt_enabled'];
             $this->configuration['default_tax']         = isset($values['default_tax']) ? $values['default_tax'] : '';
-            $this->configuration['yandex_checkout_tax'] = isset($values['yandex_checkout_tax']) ? $values['yandex_checkout_tax'] : '';
+            $this->configuration['yookassa_tax'] = isset($values['yookassa_tax']) ? $values['yookassa_tax'] : '';
         }
     }
 
@@ -286,14 +286,14 @@ class YandexCheckout extends OffsitePaymentGatewayBase
      * @throws NeedsRedirectException
      * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
      * @throws \Drupal\Core\Entity\EntityStorageException
-     * @throws \YandexCheckout\Common\Exceptions\ApiException
-     * @throws \YandexCheckout\Common\Exceptions\BadApiRequestException
-     * @throws \YandexCheckout\Common\Exceptions\ForbiddenException
-     * @throws \YandexCheckout\Common\Exceptions\InternalServerError
-     * @throws \YandexCheckout\Common\Exceptions\NotFoundException
-     * @throws \YandexCheckout\Common\Exceptions\ResponseProcessingException
-     * @throws \YandexCheckout\Common\Exceptions\TooManyRequestsException
-     * @throws \YandexCheckout\Common\Exceptions\UnauthorizedException
+     * @throws \YooKassa\Common\Exceptions\ApiException
+     * @throws \YooKassa\Common\Exceptions\BadApiRequestException
+     * @throws \YooKassa\Common\Exceptions\ForbiddenException
+     * @throws \YooKassa\Common\Exceptions\InternalServerError
+     * @throws \YooKassa\Common\Exceptions\NotFoundException
+     * @throws \YooKassa\Common\Exceptions\ResponseProcessingException
+     * @throws \YooKassa\Common\Exceptions\TooManyRequestsException
+     * @throws \YooKassa\Common\Exceptions\UnauthorizedException
      */
     public function onReturn(OrderInterface $order, Request $request)
     {
@@ -345,14 +345,14 @@ class YandexCheckout extends OffsitePaymentGatewayBase
      *   The response, or NULL to return an empty HTTP 200 response.
      * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
      * @throws \Drupal\Core\Entity\EntityStorageException
-     * @throws \YandexCheckout\Common\Exceptions\ApiException
-     * @throws \YandexCheckout\Common\Exceptions\BadApiRequestException
-     * @throws \YandexCheckout\Common\Exceptions\ForbiddenException
-     * @throws \YandexCheckout\Common\Exceptions\InternalServerError
-     * @throws \YandexCheckout\Common\Exceptions\NotFoundException
-     * @throws \YandexCheckout\Common\Exceptions\ResponseProcessingException
-     * @throws \YandexCheckout\Common\Exceptions\TooManyRequestsException
-     * @throws \YandexCheckout\Common\Exceptions\UnauthorizedException
+     * @throws \YooKassa\Common\Exceptions\ApiException
+     * @throws \YooKassa\Common\Exceptions\BadApiRequestException
+     * @throws \YooKassa\Common\Exceptions\ForbiddenException
+     * @throws \YooKassa\Common\Exceptions\InternalServerError
+     * @throws \YooKassa\Common\Exceptions\NotFoundException
+     * @throws \YooKassa\Common\Exceptions\ResponseProcessingException
+     * @throws \YooKassa\Common\Exceptions\TooManyRequestsException
+     * @throws \YooKassa\Common\Exceptions\UnauthorizedException
      */
     public function onNotify(Request $request)
     {
@@ -452,6 +452,6 @@ class YandexCheckout extends OffsitePaymentGatewayBase
      * @param $message
      */
     private function log($message) {
-        \Drupal::logger('yandex_checkout')->info($message);
+        \Drupal::logger('yookassa')->info($message);
     }
 }
