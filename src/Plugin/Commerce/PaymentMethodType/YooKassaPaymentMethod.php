@@ -5,9 +5,7 @@ namespace Drupal\yookassa\Plugin\Commerce\PaymentMethodType;
 
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentMethodType\PaymentMethodTypeBase;
-use Drupal\commerce_payment\Plugin\Commerce\PaymentMethodType\PaymentMethodTypeInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\Plugin\PluginBase;
+use Drupal\entity\BundleFieldDefinition;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 
@@ -32,7 +30,7 @@ abstract class YooKassaPaymentMethod extends PaymentMethodTypeBase
      * Field names must be unique across all bundles.
      * It is recommended to prefix them with the bundle name (plugin ID).
      *
-     * @return \Drupal\entity\BundleFieldDefinition[]
+     * @return BundleFieldDefinition[]
      *   An array of bundle field definitions, keyed by field name.
      */
     public function buildFieldDefinitions()
