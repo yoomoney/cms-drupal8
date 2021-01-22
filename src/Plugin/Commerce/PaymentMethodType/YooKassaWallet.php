@@ -3,6 +3,7 @@
 
 namespace Drupal\yookassa\Plugin\Commerce\PaymentMethodType;
 
+use Drupal\commerce_payment\Annotation\CommercePaymentMethodType;
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
 
 /**

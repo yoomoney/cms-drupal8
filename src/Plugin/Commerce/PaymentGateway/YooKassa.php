@@ -3,6 +3,7 @@
 namespace Drupal\yookassa\Plugin\Commerce\PaymentGateway;
 
 
+use Drupal;
 use Drupal\commerce\Response\NeedsRedirectException;
 use Drupal\commerce_order\Entity\Order;
 use Drupal\commerce_order\Entity\OrderInterface;
@@ -12,6 +13,9 @@ use Drupal\commerce_payment\PaymentTypeManager;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\OffsitePaymentGatewayBase;
 use Drupal\commerce_tax\Entity\TaxType;
 use Drupal\Component\Datetime\TimeInterface;
+use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -19,6 +23,15 @@ use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use YooKassa\Client;
+use YooKassa\Common\Exceptions\ApiException;
+use YooKassa\Common\Exceptions\BadApiRequestException;
+use YooKassa\Common\Exceptions\ExtensionNotFoundException;
+use YooKassa\Common\Exceptions\ForbiddenException;
+use YooKassa\Common\Exceptions\InternalServerError;
+use YooKassa\Common\Exceptions\NotFoundException;
+use YooKassa\Common\Exceptions\ResponseProcessingException;
+use YooKassa\Common\Exceptions\TooManyRequestsException;
+use YooKassa\Common\Exceptions\UnauthorizedException;
 use YooKassa\Model\NotificationEventType;
 use YooKassa\Model\Notification\NotificationSucceeded;
 use YooKassa\Model\Notification\NotificationWaitingForCapture;
@@ -46,7 +59,7 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.0.0';
+    const YOOMONEY_MODULE_VERSION = '2.0.1';
 
     /**
      * @property Client apiClient
@@ -72,7 +85,7 @@ class YooKassa extends OffsitePaymentGatewayBase
         $YooKassaClient = new Client();
         $YooKassaClient->setAuth($shopId, $secretKey);
         $userAgent = $YooKassaClient->getApiClient()->getUserAgent();
-        $userAgent->setCms('Drupal', \Drupal::VERSION);
+        $userAgent->setCms('Drupal', Drupal::VERSION);
         $userAgent->setModule('yoomoney-cms', self::YOOMONEY_MODULE_VERSION);
         $this->apiClient = $YooKassaClient;
     }
@@ -97,7 +110,7 @@ class YooKassa extends OffsitePaymentGatewayBase
      * @param array $form
      * @param FormStateInterface $form_state
      * @return array
-     * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+     * @throws InvalidPluginDefinitionException|PluginNotFoundException
      */
     public function buildConfigurationForm(array $form, FormStateInterface $form_state)
     {
@@ -278,26 +291,27 @@ class YooKassa extends OffsitePaymentGatewayBase
     /**
      * Processes the "return" request.
      *
-     * @param \Drupal\commerce_order\Entity\OrderInterface $order
+     * @param OrderInterface $order
      *   The order.
-     * @param \Symfony\Component\HttpFoundation\Request $request
+     * @param Request $request
      *   The request.
      *
      * @throws NeedsRedirectException
-     * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-     * @throws \Drupal\Core\Entity\EntityStorageException
-     * @throws \YooKassa\Common\Exceptions\ApiException
-     * @throws \YooKassa\Common\Exceptions\BadApiRequestException
-     * @throws \YooKassa\Common\Exceptions\ForbiddenException
-     * @throws \YooKassa\Common\Exceptions\InternalServerError
-     * @throws \YooKassa\Common\Exceptions\NotFoundException
-     * @throws \YooKassa\Common\Exceptions\ResponseProcessingException
-     * @throws \YooKassa\Common\Exceptions\TooManyRequestsException
-     * @throws \YooKassa\Common\Exceptions\UnauthorizedException
+     * @throws InvalidPluginDefinitionException
+     * @throws EntityStorageException
+     * @throws ApiException
+     * @throws BadApiRequestException
+     * @throws ForbiddenException
+     * @throws InternalServerError
+     * @throws NotFoundException
+     * @throws ResponseProcessingException
+     * @throws TooManyRequestsException
+     * @throws UnauthorizedException
+     * @throws PluginNotFoundException|ExtensionNotFoundException
      */
     public function onReturn(OrderInterface $order, Request $request)
     {
-        $payment_storage = \Drupal::entityTypeManager()->getStorage('commerce_payment');
+        $payment_storage = Drupal::entityTypeManager()->getStorage('commerce_payment');
         $payments        = $payment_storage->loadByProperties(['order_id' => $order->id()]);
         if ($payments) {
             $payment = reset($payments);
@@ -338,21 +352,22 @@ class YooKassa extends OffsitePaymentGatewayBase
     /**
      * Processes the notification request.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request
+     * @param Request $request
      *   The request.
      *
-     * @return \Symfony\Component\HttpFoundation\Response|null
+     * @return Response|null
      *   The response, or NULL to return an empty HTTP 200 response.
-     * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-     * @throws \Drupal\Core\Entity\EntityStorageException
-     * @throws \YooKassa\Common\Exceptions\ApiException
-     * @throws \YooKassa\Common\Exceptions\BadApiRequestException
-     * @throws \YooKassa\Common\Exceptions\ForbiddenException
-     * @throws \YooKassa\Common\Exceptions\InternalServerError
-     * @throws \YooKassa\Common\Exceptions\NotFoundException
-     * @throws \YooKassa\Common\Exceptions\ResponseProcessingException
-     * @throws \YooKassa\Common\Exceptions\TooManyRequestsException
-     * @throws \YooKassa\Common\Exceptions\UnauthorizedException
+     * @throws InvalidPluginDefinitionException
+     * @throws EntityStorageException
+     * @throws ApiException
+     * @throws BadApiRequestException
+     * @throws ForbiddenException
+     * @throws InternalServerError
+     * @throws NotFoundException
+     * @throws ResponseProcessingException
+     * @throws TooManyRequestsException
+     * @throws UnauthorizedException
+     * @throws ExtensionNotFoundException|PluginNotFoundException
      */
     public function onNotify(Request $request)
     {
@@ -365,7 +380,7 @@ class YooKassa extends OffsitePaymentGatewayBase
         $apiClient         = $this->apiClient;
         $paymentResponse   = $notificationModel->getObject();
         $paymentId         = $paymentResponse->id;
-        $payment_storage   = \Drupal::entityTypeManager()->getStorage('commerce_payment');
+        $payment_storage   = Drupal::entityTypeManager()->getStorage('commerce_payment');
         $payments          = $payment_storage->loadByProperties(['remote_id' => $paymentId]);
         if (!$payments) {
             return new Response('Bad request', 400);
@@ -391,7 +406,7 @@ class YooKassa extends OffsitePaymentGatewayBase
                     if ($captureResponse->status == PaymentStatus::SUCCEEDED) {
                         $payment->setRemoteState($paymentInfo->status);
                         $order->state = 'completed';
-                        $order->setCompletedTime(\Drupal::time()->getRequestTime());
+                        $order->setCompletedTime(Drupal::time()->getRequestTime());
                         $order->save();
                         $payment->save();
                         $this->log('Payment completed');
@@ -414,7 +429,7 @@ class YooKassa extends OffsitePaymentGatewayBase
                 case PaymentStatus::SUCCEEDED:
                     $payment->setRemoteState($paymentInfo->status);
                     $order->state = 'completed';
-                    $order->setCompletedTime(\Drupal::time()->getRequestTime());
+                    $order->setCompletedTime(Drupal::time()->getRequestTime());
                     $order->save();
                     $payment->save();
                     $this->log('Payment complete');
@@ -452,6 +467,6 @@ class YooKassa extends OffsitePaymentGatewayBase
      * @param $message
      */
     private function log($message) {
-        \Drupal::logger('yookassa')->info($message);
+        Drupal::logger('yookassa')->info($message);
     }
 }
