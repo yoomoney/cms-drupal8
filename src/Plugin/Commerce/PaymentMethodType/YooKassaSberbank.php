@@ -25,7 +25,7 @@ class YooKassaSberbank extends YooKassaPaymentMethod
      */
     public function getLabel()
     {
-        return 'Сбербанк Онлайн';
+        return 'SberPay';
     }
 
     /**
