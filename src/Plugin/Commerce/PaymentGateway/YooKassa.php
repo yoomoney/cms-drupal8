@@ -59,7 +59,7 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.2.0';
+    const YOOMONEY_MODULE_VERSION = '2.2.1';
 
     /**
      * @property Client apiClient
@@ -405,6 +405,7 @@ class YooKassa extends OffsitePaymentGatewayBase
                     $this->log('Payment info after capture: ' . json_encode($captureResponse));
                     if ($captureResponse->status == PaymentStatus::SUCCEEDED) {
                         $payment->setRemoteState($paymentInfo->status);
+                        $payment->setState('completed');
                         $order->state = 'completed';
                         $order->setCompletedTime(Drupal::time()->getRequestTime());
                         $order->save();
@@ -414,6 +415,7 @@ class YooKassa extends OffsitePaymentGatewayBase
                         return new Response('Payment completed', 200);
                     } elseif ($captureResponse->status == PaymentStatus::CANCELED) {
                         $payment->setRemoteState($paymentInfo->status);
+                        $payment->setState('canceled');
                         $payment->save();
                         $this->log('Payment canceled');
 
@@ -422,12 +424,14 @@ class YooKassa extends OffsitePaymentGatewayBase
                     break;
                 case PaymentStatus::PENDING:
                     $payment->setRemoteState($paymentInfo->status);
+                    $payment->setState('pending');
                     $payment->save();
                     $this->log('Payment pending');
 
                     return new Response(' Payment Required', 402);
                 case PaymentStatus::SUCCEEDED:
                     $payment->setRemoteState($paymentInfo->status);
+                    $payment->setState('completed');
                     $order->state = 'completed';
                     $order->setCompletedTime(Drupal::time()->getRequestTime());
                     $order->save();
@@ -437,6 +441,7 @@ class YooKassa extends OffsitePaymentGatewayBase
                     return new Response('Payment complete', 200);
                 case PaymentStatus::CANCELED:
                     $payment->setRemoteState($paymentInfo->status);
+                    $payment->setState('canceled');
                     $payment->save();
                     $this->log('Payment canceled');
 
