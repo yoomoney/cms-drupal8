@@ -59,7 +59,7 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.2.1';
+    const YOOMONEY_MODULE_VERSION = '2.2.2';
 
     /**
      * @property Client apiClient
@@ -240,12 +240,15 @@ class YooKassa extends OffsitePaymentGatewayBase
                 }
             }
         }
-        $this->entityId = $form_state->getValue('id');
-        if ($this->entityId) {
+        $gateway_id = $form_state->getValue('id', null);
+        $gateway = $gateway_id ?
+            $this->entityTypeManager->getStorage('commerce_payment_gateway')->load($gateway_id)
+            : NULL;
+        if ($gateway) {
             $form['notification_url'] = [
                 '#type'          => 'textfield',
                 '#title'         => t('Url для нотификаций'),
-                '#default_value' => $this->getNotifyUrl()->toString(),
+                '#default_value' => $gateway->getPlugin()->getNotifyUrl()->toString(),
                 '#attributes'    => ['readonly' => 'readonly'],
             ];
         }
@@ -278,13 +281,13 @@ class YooKassa extends OffsitePaymentGatewayBase
     {
         parent::submitConfigurationForm($form, $form_state);
         if (!$form_state->getErrors()) {
-            $values                                     = $form_state->getValue($form['#parents']);
-            $this->configuration['shop_id']             = $values['shop_id'];
-            $this->configuration['secret_key']          = $values['secret_key'];
+            $values                                      = $form_state->getValue($form['#parents']);
+            $this->configuration['shop_id']              = $values['shop_id'];
+            $this->configuration['secret_key']           = $values['secret_key'];
             $this->configuration['description_template'] = $values['description_template'];
-            $this->configuration['receipt_enabled']     = $values['receipt_enabled'];
-            $this->configuration['default_tax']         = isset($values['default_tax']) ? $values['default_tax'] : '';
-            $this->configuration['yookassa_tax'] = isset($values['yookassa_tax']) ? $values['yookassa_tax'] : '';
+            $this->configuration['receipt_enabled']      = $values['receipt_enabled'];
+            $this->configuration['default_tax']          = $values['default_tax'] ?? [];
+            $this->configuration['yookassa_tax']         = $values['yookassa_tax'] ?? [];
         }
     }
 
