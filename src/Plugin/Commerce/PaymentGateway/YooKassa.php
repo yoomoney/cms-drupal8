@@ -15,6 +15,7 @@ use Drupal\commerce_tax\Entity\TaxType;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Component\Render\FormattableMarkup;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -59,10 +60,10 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.2.2';
+    const YOOMONEY_MODULE_VERSION = '2.2.3';
 
     /**
-     * @property Client apiClient
+     * @var Client apiClient
      */
     public $apiClient;
 
@@ -70,9 +71,9 @@ class YooKassa extends OffsitePaymentGatewayBase
      * {@inheritdoc}
      */
     public function __construct(
-        array $configuration,
-        $plugin_id,
-        $plugin_definition,
+        array  $configuration,
+        string $plugin_id,
+        array  $plugin_definition,
         EntityTypeManagerInterface $entity_type_manager,
         PaymentTypeManager $payment_type_manager,
         PaymentMethodTypeManager $payment_method_type_manager,
@@ -82,12 +83,12 @@ class YooKassa extends OffsitePaymentGatewayBase
             $payment_method_type_manager, $time);
         $shopId               = $this->configuration['shop_id'];
         $secretKey            = $this->configuration['secret_key'];
-        $YooKassaClient = new Client();
-        $YooKassaClient->setAuth($shopId, $secretKey);
-        $userAgent = $YooKassaClient->getApiClient()->getUserAgent();
+        $yookassaClient = new Client();
+        $yookassaClient->setAuth($shopId, $secretKey);
+        $userAgent = $yookassaClient->getApiClient()->getUserAgent();
         $userAgent->setCms('Drupal', Drupal::VERSION);
         $userAgent->setModule('yoomoney-cms', self::YOOMONEY_MODULE_VERSION);
-        $this->apiClient = $YooKassaClient;
+        $this->apiClient = $yookassaClient;
     }
 
     /**
@@ -96,14 +97,20 @@ class YooKassa extends OffsitePaymentGatewayBase
     public function defaultConfiguration()
     {
         return [
-                   'shop_id'             => '',
-                   'secret_key'          => '',
-                   'description_template' => '',
-                   'receipt_enabled'     => '',
-                   'default_tax'         => '',
-                   'yookassa_tax' => array(),
-                   'notification_url'    => '',
-               ] + parent::defaultConfiguration();
+                'shop_id'             => '',
+                'secret_key'          => '',
+                'description_template' => '',
+                'receipt_enabled'     => '',
+                'default_tax'         => '',
+                'yookassa_tax' => [],
+                'notification_url'    => '',
+                'second_receipt_enabled' => '',
+                'order_type' => [],
+                'second_receipt_status' => [],
+                'default_tax_rate' => [],
+                'default_payment_subject' => [],
+                'default_payment_mode' => []
+            ] + parent::defaultConfiguration();
     }
 
     /**
@@ -114,23 +121,29 @@ class YooKassa extends OffsitePaymentGatewayBase
      */
     public function buildConfigurationForm(array $form, FormStateInterface $form_state)
     {
-        $form['shop_id'] = array(
+        $values = $form_state->getValue($form['#parents']);
+        $form['column'] = [
+            '#type' => 'container',
+            '#attributes' => ['id' => 'columns-wrapper'],
+        ];
+
+        $form['column']['shop_id'] = [
             '#type'          => 'textfield',
             '#title'         => $this->t('shopId'),
             '#default_value' => $this->configuration['shop_id'],
             '#required'      => true,
-        );
+        ];
 
-        $form['secret_key'] = array(
+        $form['column']['secret_key'] = [
             '#type'          => 'textfield',
             '#title'         => $this->t('Secret Key'),
             '#default_value' => $this->configuration['secret_key'],
             '#required'      => true,
-        );
+        ];
 
         $form = parent::buildConfigurationForm($form, $form_state);
 
-        $form['description_template'] = [
+        $form['column']['description_template'] = [
             '#type'          => 'textfield',
             '#title'         => t('Описание платежа'),
             '#description'   => t('Это описание транзакции, которое пользователь увидит при оплате, а вы — в личном кабинете ЮKassa. Например, «Оплата заказа №72».<br>
@@ -141,118 +154,272 @@ class YooKassa extends OffsitePaymentGatewayBase
                 : $this->t('Оплата заказа №%order_id%'),
         ];
 
-        $form['receipt_enabled'] = array(
+        $form['column']['receipt_enabled'] = [
             '#type'          => 'checkbox',
             '#title'         => $this->t('Отправлять в ЮKassa данные для чеков (54-ФЗ)'),
             '#default_value' => $this->configuration['receipt_enabled'],
-        );
-        if ($this->configuration['receipt_enabled']) {
+            '#ajax' => [
+                'callback' => [$this, 'verifyingReceipt'],
+                'event' => 'change',
+                'progress' => [
+                    'type' => 'throbber',
+                    'message' => t('Verifying second receipt settings..'),
+                ],
+                'wrapper'  => 'columns-wrapper',
+            ],
+        ];
 
+        $receiptEnabled = $this->checkValuesField($values,'receipt_enabled');
+        $form['column']['check_receipt_enabled_wrapper_begin'] = [
+            '#markup' => new FormattableMarkup('<div id="check_receipt_enabled" style="display: @display">', ['@display' => $receiptEnabled ? "block" : "none"]),
+        ];
 
-            $form['default_tax'] = array(
-                '#type'          => 'select',
-                '#title'         => 'Ставка по умолчанию',
-                '#options'       => array(
-                    1 => t('Без НДС'),
-                    2 => t('0%'),
-                    3 => t('10%'),
-                    4 => t('20%'),
-                    5 => t('Расчётная ставка 10/110'),
-                    6 => t('Расчётная ставка 20/120'),
-                ),
-                '#default_value' => $this->configuration['default_tax'],
-            );
+        $form['column']['default_tax'] = [
+            '#type'          => 'select',
+            '#title'         => 'Ставка по умолчанию',
+            '#options'       => [
+                1 => t('Без НДС'),
+                2 => t('0%'),
+                3 => t('10%'),
+                4 => t('20%'),
+                5 => t('Расчётная ставка 10/110'),
+                6 => t('Расчётная ставка 20/120'),
+            ],
+            '#default_value' => $this->configuration['default_tax'],
+        ];
 
-            $tax_storage = $this->entityTypeManager->getStorage('commerce_tax_type');
-            $taxTypes    = $tax_storage->loadMultiple();
-            $taxRates    = [];
-            foreach ($taxTypes as $taxType) {
-                /** @var TaxType $taxType */
-                $taxTypeConfiguration = $taxType->getPluginConfiguration();
-                $taxRates             += $taxTypeConfiguration['rates'];
-            }
+        $tax_storage = $this->entityTypeManager->getStorage('commerce_tax_type');
+        $taxTypes    = $tax_storage->loadMultiple();
+        $taxRates    = [];
+        foreach ($taxTypes as $taxType) {
+            /** @var TaxType $taxType */
+            $taxTypeConfiguration = $taxType->getPluginConfiguration();
+            $taxRates             += $taxTypeConfiguration['rates'];
+        }
 
-            if ($taxRates) {
+        if ($taxRates) {
 
-                $form['yookassa_tax_label'] = [
-                    '#type'  => 'html_tag',
-                    '#tag'   => 'label',
-                    '#value' => $this->t('Сопоставьте ставки'),
-                    '#state' => array(
-                        'visible' => array(
-                            array(
-                                array(':input[name="measurementmethod"]' => array('value' => '5')),
-                                'xor',
-                                array(':input[name="measurementmethod"]' => array('value' => '6')),
-                                'xor',
-                                array(':input[name="measurementmethod"]' => array('value' => '7')),
-                            ),
-                        ),
-                    ),
+            $form['column']['yookassa_tax_label'] = [
+                '#type'  => 'html_tag',
+                '#tag'   => 'label',
+                '#value' => $this->t('Сопоставьте ставки'),
+                '#state' => [
+                    'visible' => [
+                        [
+                            [':input[name="measurementmethod"]' => ['value' => '5']],
+                            'xor',
+                            [':input[name="measurementmethod"]' => ['value' => '6']],
+                            'xor',
+                            [':input[name="measurementmethod"]' => ['value' => '7']],
+                        ],
+                    ],
+                ],
+            ];
 
+            $form['column']['yookassa_tax_wrapper_begin'] = [
+                '#markup' => '<div>',
+            ];
+
+            $form['column']['yookassa_label_shop_tax'] = [
+                '#markup' => t('<div style="float: left;width: 200px;">Ставка в вашем магазине.</div>'),
+            ];
+
+            $form['column']['yookassa_label_tax_rate'] = [
+                '#markup' => t('<div>Ставка для чека в налоговую.</div>'),
+            ];
+
+            $form['column']['yookassa_tax_wrapper_end'] = [
+                '#markup' => '</div>',
+            ];
+
+            foreach ($taxRates as $taxRate) {
+                $form['column']['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_begin'] = [
+                    '#markup' => '<div>',
+                ];
+                $form['column']['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_lbl']   = [
+                    '#markup' => t('<div style="width: 200px;float: left;padding-top: 5px;"><label>'.$taxRate['label'].'</label></div>'),
                 ];
 
-                $form['yookassa_tax_wrapper_begin'] = array(
-                    '#markup' => '<div>',
-                );
+                $defaultTaxValue = isset($this->configuration['yookassa_tax'][$taxRate['id']])
+                    ? $this->configuration['yookassa_tax'][$taxRate['id']]
+                    : 1;
+                $form['column']['yookassa_tax'][$taxRate['id']] = [
+                    '#type'          => 'select',
+                    '#title'         => false,
+                    '#label'         => false,
+                    '#options'       => [
+                        1 => t('Без НДС'),
+                        2 => t('0%'),
+                        3 => t('10%'),
+                        4 => t('20%'),
+                        5 => t('Расчётная ставка 10/110'),
+                        6 => t('Расчётная ставка 20/120'),
+                    ],
+                    '#default_value' => $defaultTaxValue,
+                ];
 
-                $form['yookassa_label_shop_tax'] = array(
-                    '#markup' => t('<div style="float: left;width: 200px;">Ставка в вашем магазине.</div>'),
-                );
-
-                $form['yookassa_label_tax_rate'] = array(
-                    '#markup' => t('<div>Ставка для чека в налоговую.</div>'),
-                );
-
-                $form['yookassa_tax_wrapper_end'] = array(
-                    '#markup' => '</div>',
-                );
-
-                foreach ($taxRates as $taxRate) {
-                    $form['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_begin'] = array(
-                        '#markup' => '<div>',
-                    );
-                    $form['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_lbl']   = array(
-                        '#markup' => t('<div style="width: 200px;float: left;padding-top: 5px;"><label>'.$taxRate['label'].'</label></div>'),
-                    );
-
-                    $defaultTaxValue = isset($this->configuration['yookassa_tax'][$taxRate['id']])
-                        ? $this->configuration['yookassa_tax'][$taxRate['id']]
-                        : 1;
-                    $form['yookassa_tax'][$taxRate['id']] = array(
-                        '#type'          => 'select',
-                        '#title'         => false,
-                        '#label'         => false,
-                        '#options'       => array(
-                            1 => t('Без НДС'),
-                            2 => t('0%'),
-                            3 => t('10%'),
-                            4 => t('20%'),
-                            5 => t('Расчётная ставка 10/110'),
-                            6 => t('Расчётная ставка 20/120'),
-                        ),
-                        '#default_value' => $defaultTaxValue,
-                    );
-
-                    $form['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_end'] = array(
-                        '#markup' => '</div><br style="clear: both;">',
-                    );
-                }
+                $form['column']['yookassa_tax']['yookassa_tax_label_'.$taxRate['id'].'_end'] = [
+                    '#markup' => '</div><br style="clear: both;">',
+                ];
             }
         }
+
+        $form['column']['default_tax_rate'] = [
+            '#type'          => 'select',
+            '#title'         => 'Система налогообложения по умолчанию',
+            '#options'       => [
+                1 => t('Общая система налогообложения'),
+                2 => t('Упрощенная (УСН, доходы)'),
+                3 => t('Упрощенная (УСН, доходы минус расходы)'),
+                4 => t('Единый налог на вмененный доход (ЕНВД)'),
+                5 => t('Единый сельскохозяйственный налог (ЕСН)'),
+                6 => t('Патентная система налогообложения'),
+            ],
+            '#default_value' => $this->configuration['default_tax_rate'],
+        ];
+
+        $form['column']['default_tax_rate_wrapper_begin'] = [
+            '#markup' => new FormattableMarkup('<div>Выберите систему налогообложения по умолчанию. Параметр необходим, только если у вас несколько систем налогообложения, в остальных случаях не передается', []),
+        ];
+
+        $form['column']['default_tax_rate_wrapper_end'] = [
+            '#markup' => new FormattableMarkup('</div>', []),
+        ];
+
+        $form['column']['taxes_wrapper_begin'] = [
+            '#markup' => new FormattableMarkup('<div style="width: 50%">', []),
+        ];
+
+        $form['column']['taxes_block_left_wrapper_begin'] = [
+            '#markup' => new FormattableMarkup('<div style="width: 50%; float: left">', []),
+        ];
+
+        $form['column']['default_payment_subject'] = [
+            '#type'          => 'select',
+            '#title'         => 'Предмет расчета',
+            '#options'       => [
+                'commodity' => t('Товар (commodity)'),
+                'excise' => t('Подакцизный товар (excise)'),
+                'job' => t('Работа (job)'),
+                'service' => t('Услуга (service)'),
+                'gambling_bet' => t('Ставка в азартной игре (gambling_bet)'),
+                'gambling_prize' => t('Выигрыш в азартной игре (gambling_prize)'),
+                'lottery' => t('Лотерейный билет (lottery)'),
+                'lottery_prize' => t('Выигрыш в лотерею (lottery_prize)'),
+                'intellectual_activity' => t('Результаты интеллектуальной деятельности (intellectual_activity)'),
+                'payment' => t('Платеж (payment)'),
+                'agent_commission' => t('Агентское вознаграждение (agent_commission)'),
+                'composite' => t('Несколько вариантов (composite)'),
+                'another' => t('Другое (another)'),
+            ],
+            '#default_value' => $this->configuration['default_payment_subject'],
+        ];
+
+        $form['column']['taxes_block_left_wrapper_end'] = [
+            '#markup' => new FormattableMarkup('</div>', []),
+        ];
+
+        $form['column']['taxes_block_right_wrapper_begin'] = [
+            '#markup' => new FormattableMarkup('<div style="width: 50%; float: right">', []),
+        ];
+
+        $form['column']['default_payment_mode'] = [
+            '#type'          => 'select',
+            '#title'         => 'Способ расчета',
+            '#options'       => [
+                'full_prepayment' => t('Полная предоплата (full_prepayment)'),
+                'partial_prepayment' => t('Частичная предоплата (partial_prepayment)'),
+                'advance' => t('Аванс (advance)'),
+                'full_payment' => t('Полный расчет (full_payment)'),
+                'partial_payment' => t('Частичный расчет и кредит (partial_payment)'),
+                'credit' => t('Кредит (credit)'),
+                'credit_payment' => t('Выплата по кредиту (credit_payment)'),
+            ],
+            '#default_value' => $this->configuration['default_payment_mode'],
+        ];
+
+        $form['column']['taxes_block_right_wrapper_end'] = [
+            '#markup' => new FormattableMarkup('</div>', []),
+        ];
+
+
+        $form['column']['taxes_wrapper_end'] = [
+            '#markup' => new FormattableMarkup('</div>', []),
+        ];
+
+
+        $form['column']['second_receipt_enabled'] = [
+            '#type' => 'checkbox',
+            '#title' => $this->t('Отправлять второй чек'),
+            '#default_value' => $this->configuration['second_receipt_enabled'] ?? 0,
+            '#ajax' => [
+                'callback' => [$this, 'verifyingReceipt'],
+                'event' => 'change',
+                'progress' => [
+                    'type' => 'throbber',
+                    'message' => t('Verifying second receipt settings..'),
+                ],
+                'wrapper' => 'columns-wrapper',
+            ],
+        ];
+
+        $secondReceiptEnabled = $this->checkValuesField($values, 'second_receipt_enabled', 'receipt_enabled');
+
+        $form['column']['check_second_receipt_enabled_wrapper_begin'] = [
+            '#markup' => new FormattableMarkup('<div id="check_second_receipt_enabled" style="display: @display">', ['@display' => $secondReceiptEnabled ? "block" : "none"]),
+        ];
+
+        $form['column']['order_type'] = [
+            '#type' => 'select',
+            '#title' => 'Типа заказа, используемый на сайте',
+            '#label' => false,
+            '#options' => $this->getOrderTypes(),
+            '#default_value' => $this->configuration['order_type'] ?? [],
+            '#empty_option' => '- Выбрать -',
+            '#ajax' => [
+                'callback' => [$this, 'verifyingOrderStatuses'],
+                'event' => 'change',
+                'progress' => [
+                    'type' => 'throbber',
+                    'message' => t('Verifying order statuses..'),
+                ],
+                'wrapper' => 'columns-wrapper'
+            ],
+            '#required' => $secondReceiptEnabled ?? false,
+        ];
+
+
+        $form['column']['second_receipt_status'] = [
+            '#type' => 'select',
+            '#title' => 'Отправлять второй чек при переходе заказа в статус',
+            '#label' => false,
+            '#options' => $this->getStates(!empty($values['column']['order_type']) ? $values['column']['order_type'] : $this->configuration['order_type'] ?? ''),
+            '#default_value' => $this->configuration['second_receipt_status'] ?? [],
+            '#empty_option' => '- Выбрать -',
+            '#required' => $secondReceiptEnabled ?? false,
+        ];
+
+        $form['column']['check_second_receipt_enabled_wrapper_end'] = [
+            '#markup' => '</div>',
+        ];
+
+        $form['column']['check_receipt_enabled_wrapper_end'] = [
+            '#markup' => '</div>',
+        ];
+
         $gateway_id = $form_state->getValue('id', null);
         $gateway = $gateway_id ?
             $this->entityTypeManager->getStorage('commerce_payment_gateway')->load($gateway_id)
             : NULL;
         if ($gateway) {
-            $form['notification_url'] = [
+            $form['column']['notification_url'] = [
                 '#type'          => 'textfield',
                 '#title'         => t('Url для нотификаций'),
                 '#default_value' => $gateway->getPlugin()->getNotifyUrl()->toString(),
                 '#attributes'    => ['readonly' => 'readonly'],
             ];
         }
-        $form['log_file'] = [
+        $form['column']['log_file'] = [
             '#type' => 'item',
             '#title' => t('Логирование'),
             '#markup' => t('Посмотреть <a href="' . $GLOBALS['base_url'] . '/admin/reports/dblog?type[]=yookassa"
@@ -266,11 +433,11 @@ class YooKassa extends OffsitePaymentGatewayBase
     public function validateConfigurationForm(array &$form, FormStateInterface $form_state)
     {
         $values = $form_state->getValue($form['#parents']);
-        if (!preg_match('/^test_.*|live_.*$/i', $values['secret_key'])) {
+        if (!preg_match('/^test_.*|live_.*$/i', $values['column']['secret_key'])) {
             $markup = new TranslatableMarkup('Такого секретного ключа нет. Если вы уверены, что скопировали ключ правильно, значит, он по какой-то причине не работает.
-                  Выпустите и активируйте ключ заново — 
+                  Выпустите и активируйте ключ заново —
                   <a href="https://yookassa.ru/joinups">в личном кабинете ЮKassa</a>');
-            $form_state->setError($form['secret_key'], $markup);
+            $form_state->setError($form['column']['secret_key'], $markup);
         }
     }
 
@@ -281,13 +448,19 @@ class YooKassa extends OffsitePaymentGatewayBase
     {
         parent::submitConfigurationForm($form, $form_state);
         if (!$form_state->getErrors()) {
-            $values                                      = $form_state->getValue($form['#parents']);
-            $this->configuration['shop_id']              = $values['shop_id'];
-            $this->configuration['secret_key']           = $values['secret_key'];
-            $this->configuration['description_template'] = $values['description_template'];
-            $this->configuration['receipt_enabled']      = $values['receipt_enabled'];
-            $this->configuration['default_tax']          = $values['default_tax'] ?? [];
-            $this->configuration['yookassa_tax']         = $values['yookassa_tax'] ?? [];
+            $values                                                   = $form_state->getValue($form['#parents']);
+            $this->configuration['shop_id']                           = $values['column']['shop_id'];
+            $this->configuration['secret_key']                        = $values['column']['secret_key'];
+            $this->configuration['description_template']              = $values['column']['description_template'];
+            $this->configuration['receipt_enabled']                   = $values['column']['receipt_enabled'];
+            $this->configuration['second_receipt_enabled']            = $values['column']['receipt_enabled'] ? $values['column']['second_receipt_enabled'] : 0;
+            $this->configuration['default_tax']                       = $values['column']['default_tax'] ?? [];
+            $this->configuration['yookassa_tax']                      = $values['column']['yookassa_tax'] ?? [];
+            $this->configuration['second_receipt_status']             = $values['column']['second_receipt_status'] ?? [];
+            $this->configuration['order_type']                        = $values['column']['order_type'] ?? 'default';
+            $this->configuration['default_tax_rate']                  = $values['column']['default_tax_rate'] ?? [];
+            $this->configuration['default_payment_subject']           = $values['column']['default_payment_subject'] ?? [];
+            $this->configuration['default_payment_mode']              = $values['column']['default_payment_mode'] ?? [];
         }
     }
 
@@ -476,5 +649,95 @@ class YooKassa extends OffsitePaymentGatewayBase
      */
     private function log($message) {
         Drupal::logger('yookassa')->info($message);
+    }
+
+    /**
+     * @return array
+     * @throws InvalidPluginDefinitionException
+     * @throws PluginNotFoundException
+     */
+    private function getOrderTypes(): array
+    {
+        $entity_type_manager = \Drupal::entityTypeManager();
+        $order_type_storage = $entity_type_manager->getStorage('commerce_order_type');
+        $order_types = $order_type_storage->loadMultiple();
+
+        $result = [];
+        foreach ($order_types as $type) {
+            $result[$type->id()] = $type->label();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Получение доступных статусов в выбранном типе заказов
+     *
+     * @param $orderType
+     * @return array
+     */
+    private function getStates($orderType): array
+    {
+        $result = [];
+        $config = !is_array($orderType) ? \Drupal::config('commerce_order.commerce_order_type.'.$orderType)->getRawData() : null;
+
+        if (!empty($config)) {
+            $workflow_manager = \Drupal::service('plugin.manager.workflow');
+            $workflow = $workflow_manager->createInstance($config['workflow']);
+
+            foreach ($workflow->getStates() as $state) {
+                $result[$state->getId()] = $state->getLabel();
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ajax перестройка формы после внесения изменения в нее пользователем (включение\отключение чекбоксов)
+     *
+     * @param array $form
+     * @return mixed
+     */
+    public function verifyingReceipt(array &$form)
+    {
+        return $form['configuration']['form']['column'];
+    }
+
+    /**
+     * Ajax изменение статусов заказов select поле second_receipt_status (после изменения выбора в поле order_type)
+     *
+     * @param array $form
+     * @param FormStateInterface $form_state
+     * @return mixed
+     */
+    public function verifyingOrderStatuses(array &$form, FormStateInterface $form_state)
+    {
+        $trigger = $form_state->getTriggeringElement();
+
+        $states = $this->getStates($trigger['#value']);
+        $form['configuration']['form']['column']['second_receipt_status']['#options'] = $states ?? [];
+        return $form['configuration']['form']['column'];
+    }
+
+    /**
+     * Проверка значения полей для отображения зависимых полей после переформирования формы
+     *
+     * @param $values
+     * @param string $field
+     * @param string|null $fieldDepended
+     * @return bool
+     */
+    private function checkValuesField($values, string $field, string $fieldDepended = null): bool
+    {
+        if (!empty($fieldDepended) && empty($values['column'][$fieldDepended]) && empty($this->configuration[$fieldDepended])) {
+            return false;
+        }
+
+        if (!empty($values['column'][$field]) || !empty($this->configuration[$field])) {
+            return true;
+        }
+
+        return false;
     }
 }

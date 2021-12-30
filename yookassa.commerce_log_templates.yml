@@ -1,0 +1,4 @@
+order_sent_second_reciept:
+  category: commerce_order
+  label: 'Second receipt sent'
+  template: '<p>Second receipt sent! Amount: <em>{{ amount }}</em></p>'
