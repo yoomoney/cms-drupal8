@@ -60,7 +60,7 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.2.3';
+    const YOOMONEY_MODULE_VERSION = '2.2.4';
 
     /**
      * @var Client apiClient

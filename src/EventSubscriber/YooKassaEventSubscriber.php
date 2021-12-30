@@ -106,14 +106,14 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
             $payments = \Drupal::entityTypeManager()->getStorage('commerce_payment')->loadByProperties(['order_id' => $orderId]);
             $paymentId = !empty($payments) ? array_shift($payments)->getRemoteId() : null;
             $amount = $order->getTotalPrice()->getNumber();
-            $profile = $order->getCustomer();
+            $customerEmail = $order->get('mail')->getString();
 
             if (!$lastReceipt = $this->getLastReceipt($paymentId)) {
                 $this->log('LastReceipt is empty!', 'error');
                 return null;
             }
 
-            if ($receiptRequest = $this->buildSecondReceipt($lastReceipt, $paymentId, $profile)) {
+            if ($receiptRequest = $this->buildSecondReceipt($lastReceipt, $paymentId, $customerEmail)) {
 
                 try {
                     $client->createReceipt($receiptRequest);
@@ -125,7 +125,7 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
                             'request' => $receiptRequest->toArray(),
                             'lastReceipt' => $lastReceipt->toArray(),
                             'paymentId' => $paymentId,
-                            'customEmail' => $profile->getEmail()
+                            'customEmail' => $customerEmail
                         ]), 'error');
                 }
             }
@@ -146,10 +146,10 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
     /**
      * @param PaymentReceiptResponse $lastReceipt
      * @param string $paymentId
-     * @param User $profile
+     * @param string $customerEmail
      * @return mixed|null
      */
-    private function buildSecondReceipt(PaymentReceiptResponse $lastReceipt, string $paymentId, User $profile)
+    private function buildSecondReceipt(PaymentReceiptResponse $lastReceipt, string $paymentId, string $customerEmail)
     {
         if ($lastReceipt->getType() === "refund") {
             $this->log('Last receipt is refund', 'error');
@@ -165,7 +165,7 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
 
         try {
             $customer = new ReceiptCustomer();
-            $customer->setEmail($profile->getEmail());
+            $customer->setEmail($customerEmail);
 
             if (empty($customer)) {
                 $this->log('Customer email for second receipt are empty', 'error');
