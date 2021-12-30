@@ -61,8 +61,8 @@ class PaymentOffsiteForm extends BasePaymentOffsiteForm
                 ));
 
             if ($config['receipt_enabled'] == 1) {
-                $profile = $order->getCustomer();
-                $builder->setReceiptEmail($profile->getEmail());
+                $profileEmail = $order->get('mail')->getString();
+                $builder->setReceiptEmail($profileEmail);
                 $items = $order->getItems();
                 /** @var OrderItem $item */
                 foreach ($items as $item) {
@@ -87,7 +87,7 @@ class PaymentOffsiteForm extends BasePaymentOffsiteForm
                     }
 
                     $priceWithTax = $item->getUnitPrice()->getNumber() * (1 + $percentage);
-                    $builder->addReceiptItem($item->getTitle(), $priceWithTax, $item->getQuantity(), $vat_code);
+                    $builder->addReceiptItem($item->getTitle(), $priceWithTax, $item->getQuantity(), $vat_code, $config['default_payment_mode'], $config['default_payment_subject']);
                 }
             }
             $paymentRequest = $builder->build();

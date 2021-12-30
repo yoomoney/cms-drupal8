@@ -1,0 +1,6 @@
+services:
+  yookassa.yoo_kassa_event_subscriber:
+    class: Drupal\yookassa\EventSubscriber\YooKassaEventSubscriber
+    arguments: ['@entity_type.manager']
+    tags:
+      - { name: event_subscriber }

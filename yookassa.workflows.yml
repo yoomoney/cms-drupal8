@@ -1,0 +1,36 @@
+yookassa_workflow:
+  id: yookassa_workflow
+  group: commerce_order
+  label: 'Yookassa order statuses'
+  states:
+    draft:
+      label: Draft
+    waiting:
+      label: Waiting
+    paid:
+      label: Paid
+    completed:
+      label: Completed
+    canceled:
+      label: Canceled
+  transitions:
+    place:
+      label: 'Place order'
+      from: [draft]
+      to:   waiting
+    waiting:
+      label: 'Waiting for paid'
+      from: [waiting]
+      to: paid
+    paid:
+      label: 'Paid'
+      from: [paid]
+      to: completed
+    complete:
+      label: 'Complete order'
+      from: [ draft, waiting, paid ]
+      to: completed
+    cancel:
+      label: 'Cancel order'
+      from: [draft, waiting, paid]
+      to:   canceled
