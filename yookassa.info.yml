@@ -7,4 +7,3 @@ core_version_requirement: ^8 || ^9
 dependencies:
   - commerce:commerce_payment
   - commerce:commerce_tax
-  - rules

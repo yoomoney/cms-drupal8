@@ -60,7 +60,7 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.2.4';
+    const YOOMONEY_MODULE_VERSION = '2.2.5';
 
     /**
      * @var Client apiClient
@@ -407,18 +407,15 @@ class YooKassa extends OffsitePaymentGatewayBase
             '#markup' => '</div>',
         ];
 
-        $gateway_id = $form_state->getValue('id', null);
-        $gateway = $gateway_id ?
-            $this->entityTypeManager->getStorage('commerce_payment_gateway')->load($gateway_id)
-            : NULL;
-        if ($gateway) {
+        if ($form_state->getValue('id') || !empty($this->configuration['notification_url'])) {
             $form['column']['notification_url'] = [
-                '#type'          => 'textfield',
-                '#title'         => t('Url для нотификаций'),
-                '#default_value' => $gateway->getPlugin()->getNotifyUrl()->toString(),
-                '#attributes'    => ['readonly' => 'readonly'],
+                '#type' => 'textfield',
+                '#title' => t('Url для нотификаций'),
+                '#default_value' => $this->getPaymentName($form_state),
+                '#attributes' => ['readonly' => 'readonly'],
             ];
         }
+
         $form['column']['log_file'] = [
             '#type' => 'item',
             '#title' => t('Логирование'),
@@ -461,6 +458,7 @@ class YooKassa extends OffsitePaymentGatewayBase
             $this->configuration['default_tax_rate']                  = $values['column']['default_tax_rate'] ?? [];
             $this->configuration['default_payment_subject']           = $values['column']['default_payment_subject'] ?? [];
             $this->configuration['default_payment_mode']              = $values['column']['default_payment_mode'] ?? [];
+            $this->configuration['notification_url']                  = $values['column']['notification_url'] ?? '';
         }
     }
 
@@ -548,8 +546,11 @@ class YooKassa extends OffsitePaymentGatewayBase
     public function onNotify(Request $request)
     {
         $rawBody           = $request->getContent();
-        $this->log('Notification: ' . $rawBody);
         $notificationData  = json_decode($rawBody, true);
+        if (!$notificationData) {
+            return new Response('Bad request', 400);
+        }
+        $this->log('Notification: ' . $rawBody);
         $notificationModel = ($notificationData['event'] === NotificationEventType::PAYMENT_SUCCEEDED)
             ? new NotificationSucceeded($notificationData)
             : new NotificationWaitingForCapture($notificationData);
@@ -582,9 +583,6 @@ class YooKassa extends OffsitePaymentGatewayBase
                     if ($captureResponse->status == PaymentStatus::SUCCEEDED) {
                         $payment->setRemoteState($paymentInfo->status);
                         $payment->setState('completed');
-                        $order->state = 'completed';
-                        $order->setCompletedTime(Drupal::time()->getRequestTime());
-                        $order->save();
                         $payment->save();
                         $this->log('Payment completed');
 
@@ -608,9 +606,6 @@ class YooKassa extends OffsitePaymentGatewayBase
                 case PaymentStatus::SUCCEEDED:
                     $payment->setRemoteState($paymentInfo->status);
                     $payment->setState('completed');
-                    $order->state = 'completed';
-                    $order->setCompletedTime(Drupal::time()->getRequestTime());
-                    $order->save();
                     $payment->save();
                     $this->log('Payment complete');
 
@@ -699,7 +694,7 @@ class YooKassa extends OffsitePaymentGatewayBase
      * @param array $form
      * @return mixed
      */
-    public function verifyingReceipt(array &$form)
+    public function verifyingReceipt(array $form)
     {
         return $form['configuration']['form']['column'];
     }
@@ -739,5 +734,32 @@ class YooKassa extends OffsitePaymentGatewayBase
         }
 
         return false;
+    }
+
+    /**
+     * Формирование url для уведомлений
+     * @param string $paymentName
+     * @return Url
+     */
+    private function getNotificationUrl(string $paymentName): Url
+    {
+        return Url::fromRoute(
+            'commerce_payment.notify',
+            ['commerce_payment_gateway' => $paymentName],
+            ['absolute' => TRUE]
+        );
+    }
+
+    /**
+     * Получение сформированного url для уведомлений
+     * @param FormStateInterface $form_state
+     * @return Drupal\Core\GeneratedUrl|string
+     */
+    private function getPaymentName(FormStateInterface $form_state)
+    {
+        $name = !empty($form_state->getValue('id')) ? $form_state->getValue('id') : 'yookassa';
+        $url = !empty($this->configuration['notification_url']) ? $this->configuration['notification_url'] : $this->getNotificationUrl($name);
+
+        return !is_string($url) ? $url->toString() : $url;
     }
 }

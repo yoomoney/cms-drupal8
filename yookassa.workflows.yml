@@ -28,7 +28,7 @@ yookassa_workflow:
       to: completed
     complete:
       label: 'Complete order'
-      from: [ draft, waiting, paid ]
+      from: [draft, waiting, paid]
       to: completed
     cancel:
       label: 'Cancel order'
