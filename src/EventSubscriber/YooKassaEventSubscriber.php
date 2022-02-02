@@ -8,15 +8,21 @@ use Drupal\commerce_order\Entity\Order;
 use Drupal\commerce_order\Event\OrderEvent;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\user\Entity\User;
 use Drupal\yookassa\Plugin\Commerce\PaymentGateway\YooKassa;
 use Exception;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use YooKassa\Client;
+use YooKassa\Common\AbstractRequest;
 use YooKassa\Common\Exceptions\ApiException;
+use YooKassa\Common\Exceptions\BadApiRequestException;
 use YooKassa\Common\Exceptions\ExtensionNotFoundException;
+use YooKassa\Common\Exceptions\ForbiddenException;
+use YooKassa\Common\Exceptions\InternalServerError;
+use YooKassa\Common\Exceptions\NotFoundException;
+use YooKassa\Common\Exceptions\ResponseProcessingException;
+use YooKassa\Common\Exceptions\TooManyRequestsException;
+use YooKassa\Common\Exceptions\UnauthorizedException;
 use YooKassa\Model\Receipt\PaymentMode;
 use YooKassa\Model\ReceiptCustomer;
 use YooKassa\Model\ReceiptItem;
@@ -24,7 +30,6 @@ use YooKassa\Model\ReceiptType;
 use YooKassa\Model\Settlement;
 use YooKassa\Request\Receipts\CreatePostReceiptRequest;
 use YooKassa\Request\Receipts\PaymentReceiptResponse;
-use YooKassa\Request\Receipts\ReceiptResponseInterface;
 use YooKassa\Request\Receipts\ReceiptResponseItemInterface;
 
 /**
@@ -41,25 +46,20 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
     protected $logStorage;
 
     /**
-     * @var YooKassa apiClient
+     * @var Client
      */
     public $apiClient;
 
     protected $config;
 
     /**
-     * Constructor for OrderWorkflowSubscriber.
+     * Constructor for YooKassaEventSubscriber.
+     * @param EntityTypeManagerInterface $entity_type_manager
+     * @throws InvalidPluginDefinitionException
+     * @throws PluginNotFoundException
      */
     public function __construct(EntityTypeManagerInterface $entity_type_manager) {
-        $yookassaConfig = \Drupal::config('commerce_payment.commerce_payment_gateway.yookassa')->getOriginal('configuration');
-        $yookassaClient = new Client();
-        $yookassaClient->setAuth($yookassaConfig['shop_id'], $yookassaConfig['secret_key']);
-        $userAgent = $yookassaClient->getApiClient()->getUserAgent();
-        $userAgent->setCms('Drupal', Drupal::VERSION);
-        $userAgent->setModule('yoomoney-cms', YooKassa::YOOMONEY_MODULE_VERSION);
-        $this->apiClient = $yookassaClient;
-        $this->logStorage = Drupal::entityTypeManager()->getStorage('commerce_log');
-        $this->config = $yookassaConfig;
+        $this->logStorage = $entity_type_manager->getStorage('commerce_log');
     }
 
     /**
@@ -83,27 +83,40 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
 
     /**
      * Send Second Receipt.
-     *
      * @param OrderEvent $event
      * @return void|null
+     * @throws ApiException
+     * @throws BadApiRequestException
+     * @throws Drupal\Core\Entity\EntityStorageException
+     * @throws ExtensionNotFoundException
+     * @throws ForbiddenException
+     * @throws InternalServerError
+     * @throws InvalidPluginDefinitionException
+     * @throws NotFoundException
+     * @throws PluginNotFoundException
+     * @throws ResponseProcessingException
+     * @throws TooManyRequestsException
+     * @throws UnauthorizedException
      */
     public function onSendSecondReceipt(OrderEvent $event)
     {
         /** @var Order $order */
         $order = $event->getOrder();
-        $isSentSecondReceipt = $order->getData('send_second_receipt');
+        $isSentSecondReceipt = $order->getData('send_second_receipt') ?? false;
         $state = $order->getState()->getValue();
+        $this->config = $this->getPaymentConfig($order);
 
         if (
             !$isSentSecondReceipt
+            && !is_null($this->config)
             && $this->config['second_receipt_enabled']
             && $state['value'] == $this->config['second_receipt_status']
         ) {
-            $client = $this->apiClient;
+            $this->apiClient = $this->getClient($this->config);
             $order->setData('send_second_receipt', true);
 
             $orderId = $order->get('order_id')->getString();
-            $payments = \Drupal::entityTypeManager()->getStorage('commerce_payment')->loadByProperties(['order_id' => $orderId]);
+            $payments = Drupal::entityTypeManager()->getStorage('commerce_payment')->loadByProperties(['order_id' => $orderId]);
             $paymentId = !empty($payments) ? array_shift($payments)->getRemoteId() : null;
             $amount = $order->getTotalPrice()->getNumber();
             $customerEmail = $order->get('mail')->getString();
@@ -116,7 +129,7 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
             if ($receiptRequest = $this->buildSecondReceipt($lastReceipt, $paymentId, $customerEmail)) {
 
                 try {
-                    $client->createReceipt($receiptRequest);
+                    $this->apiClient->createReceipt($receiptRequest);
                     $this->logStorage->generate($order, 'order_sent_second_reciept', ['amount' => number_format((float)$amount, 2, '.', '')])->save();
                     $this->log('SecondReceipt Send: ' . json_encode($receiptRequest), 'info');
                 } catch (ApiException $e) {
@@ -135,6 +148,15 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
     /**
      * @param $paymentId
      * @return mixed|null
+     * @throws ApiException
+     * @throws ExtensionNotFoundException
+     * @throws BadApiRequestException
+     * @throws ForbiddenException
+     * @throws InternalServerError
+     * @throws NotFoundException
+     * @throws ResponseProcessingException
+     * @throws TooManyRequestsException
+     * @throws UnauthorizedException
      */
     private function getLastReceipt($paymentId)
     {
@@ -147,7 +169,7 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
      * @param PaymentReceiptResponse $lastReceipt
      * @param string $paymentId
      * @param string $customerEmail
-     * @return mixed|null
+     * @return AbstractRequest|null
      */
     private function buildSecondReceipt(PaymentReceiptResponse $lastReceipt, string $paymentId, string $customerEmail)
     {
@@ -244,5 +266,30 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
             PaymentMode::CREDIT,
             PaymentMode::CREDIT_PAYMENT
         );
+    }
+
+    /**
+     * @param Order $order
+     * @return mixed|null
+     */
+    private function getPaymentConfig(Order $order)
+    {
+        $paymentId = $order->get('payment_gateway')->getString();
+
+        return $paymentId ? Drupal::config('commerce_payment.commerce_payment_gateway.'.$paymentId)->getOriginal('configuration') : null;
+    }
+
+    /**
+     * @param array $yookassaConfig
+     * @return Client
+     */
+    private function getClient(array $yookassaConfig): Client
+    {
+        $yookassaClient = new Client();
+        $yookassaClient->setAuth($yookassaConfig['shop_id'], $yookassaConfig['secret_key']);
+        $userAgent = $yookassaClient->getApiClient()->getUserAgent();
+        $userAgent->setCms('Drupal', Drupal::VERSION);
+        $userAgent->setModule('yoomoney-cms', YooKassa::YOOMONEY_MODULE_VERSION);
+        return $yookassaClient;
     }
 }

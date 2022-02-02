@@ -1,3 +1,0 @@
-commerce_order.commerce_order.presave:
-  label: 'Create and send second receipt Yookassa'
-  category: 'Order'
