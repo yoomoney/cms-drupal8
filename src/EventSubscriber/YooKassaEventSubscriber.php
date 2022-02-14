@@ -108,8 +108,8 @@ class YooKassaEventSubscriber implements EventSubscriberInterface
 
         if (
             !$isSentSecondReceipt
-            && !is_null($this->config)
-            && $this->config['second_receipt_enabled']
+            && !empty($this->config)
+            && !empty($this->config['second_receipt_enabled'])
             && $state['value'] == $this->config['second_receipt_status']
         ) {
             $this->apiClient = $this->getClient($this->config);
