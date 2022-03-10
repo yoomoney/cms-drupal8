@@ -60,7 +60,7 @@ use YooKassa\Request\Payments\Payment\CreateCaptureRequest;
  */
 class YooKassa extends OffsitePaymentGatewayBase
 {
-    const YOOMONEY_MODULE_VERSION = '2.2.6';
+    const YOOMONEY_MODULE_VERSION = '2.2.7';
 
     /**
      * @var Client apiClient
@@ -500,6 +500,9 @@ class YooKassa extends OffsitePaymentGatewayBase
             $captureRequest = CreateCaptureRequest::builder()->setAmount($paymentInfoResponse->getAmount())->build();
             $paymentInfoResponse  = $apiClient->capturePayment($captureRequest, $paymentId);
             $this->log('Payment info after capture: ' . json_encode($paymentInfoResponse));
+        }
+        if ($payment->getState()->getString() !== 'new') {
+            return;
         }
         if ($paymentInfoResponse->status == PaymentStatus::SUCCEEDED) {
             $payment->setRemoteState($paymentInfoResponse->status);
