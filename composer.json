@@ -2,7 +2,8 @@
     "name": "drupal/commerce_yookassa",
     "type": "drupal-module",
     "description": "Provides Commerce integration for YooKassa.",
-    "homepage": "https://github.com/yoomoney/cms-drupal8",
+    "homepage": "https://drupal.org/project/commerce_yookassa",
+    "license": "GPL-2.0-or-later",
     "require": {
         "drupal/commerce": "~2.0",
         "yoomoney/yookassa-sdk-php": "^2.0"
