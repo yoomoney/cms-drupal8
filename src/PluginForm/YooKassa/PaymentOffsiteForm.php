@@ -114,8 +114,7 @@ class PaymentOffsiteForm extends BasePaymentOffsiteForm
 
             return $this->buildRedirectForm($form, $form_state, $redirect_url, $data);
         } catch (ApiException $e) {
-            Drupal::logger('yookassa')->error('Api error: ' . $e->getMessage());
-            drupal_set_message(t('Не удалось создать платеж.'), 'error');
+            Drupal::logger('yookassa')->error('Error create payment. Api error: ' . $e->getMessage());
             throw new PaymentGatewayException();
         }
     }

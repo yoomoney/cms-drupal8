@@ -1,0 +1,8 @@
+{
+  "require": {
+    "yoomoney/yookassa-sdk-php": {
+      "version": "v2.2.8",
+      "url": "https://github.com/yoomoney/yookassa-sdk-php/archive/release/v2.2.8.zip"
+    }
+  }
+}
